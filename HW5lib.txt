@@ -1,0 +1,66 @@
+import numpy as np
+from scipy import linalg
+from scipy import sparse
+from functools import reduce
+from tensorflow.examples.tutorials.mnist import input_data
+
+_mnst  = input_data.read_data_sets("../MNIST_data/", validation_size=10000)
+imgs   = np.matrix(np.r_[_mnst.train.images,_mnst.test.images])
+lbls   = np.matrix(np.r_[_mnst.train.labels,_mnst.test.labels]).T
+
+imgs_val = np.matrix(np.r_[_mnst.validation.images])
+lbls_val = np.matrix(_mnst.validation.labels).T
+
+class neural_net:
+    def __init__(self, m, n, sparse = False):
+        self._m      = m
+        self._n      = n
+        self._R      = np.matrix(np.random.randn(n,m), dtype=np.float32)
+        self._theta  = np.matrix(np.ones(m, dtype=np.float32))
+        self._sparse = sparse
+
+    @staticmethod
+    def sigmoid(z):
+        return 1/(1+np.exp(-z))
+
+    def predict(self,x):
+        if isinstance(x, sparse.csc_matrix):
+            return self._theta*neural_net.sigmoid(self._R*x)*self._theta
+        return (self.sigmoid(x*self._R)*self._theta).A1
+
+    def train(self,x,y,gamma=0.1):
+        gamma = np.float32(gamma)
+        z = neural_net.sigmoid(x*self._R)
+        self._theta = linalg.solve(z.T*z+gamma*np.eye(self._m, dtype=np.float32),z.T*y)
+        #self._theta = (z.T*z+gamma*np.eye(self._m, dtype=np.float32)).I * z.T*y
+        return "done"
+
+
+
+class mnist_classifier:
+    @staticmethod
+    def y(lbls,i):
+        return (lbls == i)*np.float32(2)-np.float32(1)
+    
+    def __init__(self,m,imgs,lbls,gamma=0.1):
+        self.nets = [neural_net(m,28**2) for l in range(10)]
+        training  = [self.nets[l].train for l in range(10)]
+        [f(imgs,self.y(lbls,i),gamma) and print(i) for i,f in enumerate(training)]
+        
+    def predict(self,img):
+        predicting = [self.nets[l].predict for l in range(10)]
+        m = map(lambda f: f(img), predicting)
+        return map(lambda x: max(zip(x,range(10)))[1], zip(*m))
+    
+    def compute_error(self,imgs, lbls):
+        m = map(lambda x,y: x==y, self.predict(imgs), lbls.A1)
+        return 100-sum(m)/len(lbls)*100
+            
+            
+            
+            
+            
+            
+            
+            
+            
